@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Activity, Brain, CalendarDays, Check, ChevronRight, Clock3, Heart, MessageCircle, ShieldCheck, Sparkles, Target, TrendingUp } from 'lucide-react'
+import { Activity, Brain, CalendarDays, Check, ChevronRight, Clock3, Heart, MessageCircle, Play, ShieldCheck, Sparkles, Target, TrendingUp } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { activities, weeklyProgress } from '../data/mockData'
 import { supabase, supabaseConfigured } from '../supabaseClient'
+import MemoryMatchGame from './MemoryMatchGame'
 
 const exercises = [
-  { key: 'memory-match', title: 'Memory match', description: 'A light matching activity to practice recall.', time: 6, icon: Brain, tint: 'bg-[#f1f0df] text-[#6A6F34]' },
+  { key: 'memory-match', title: 'Memory match', description: 'A light matching activity to practice recall.', time: 6, icon: Brain, tint: 'bg-[#f1f0df] text-[#6A6F34]', isInteractive: true },
   { key: 'focus-flow', title: 'Focus flow', description: 'A short attention exercise at your own pace.', time: 5, icon: Target, tint: 'bg-[#f3eac3] text-[#6A6F34]' },
   { key: 'mindful-breathing', title: 'Mindful breathing', description: 'Pause for a few calm, steady breaths.', time: 3, icon: Sparkles, tint: 'bg-[#f5efda] text-[#807846]' },
 ]
@@ -14,9 +15,14 @@ function PageHeading({ eyebrow, title, description, action }) {
 }
 
 function ExercisesPage() {
+  const [activeGame, setActiveGame] = useState('')
   const [started, setStarted] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+
+  if (activeGame === 'memory-match') {
+    return <MemoryMatchGame onBack={() => setActiveGame('')} onComplete={() => setMessage('Memory match saved to your progress!')} />
+  }
 
   async function complete(exercise) {
     if (!supabaseConfigured) { setMessage('Demo mode: connect Supabase to save completed exercises.'); return }
@@ -27,7 +33,54 @@ function ExercisesPage() {
     setBusy(false)
   }
 
-  return <><PageHeading eyebrow="YOUR PRACTICE" title="Exercises" description="Choose a short activity. Take a break or stop whenever you like."/><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{exercises.map(({key,title,description,time,icon:Icon,tint})=><article key={key} className="flex flex-col rounded-2xl border border-line bg-white p-5 shadow-soft"><span className={`grid h-11 w-11 place-items-center rounded-xl ${tint}`}><Icon size={20}/></span><h3 className="mt-4 text-base font-semibold">{title}</h3><p className="mt-2 min-h-10 text-sm leading-5 text-muted">{description}</p><div className="mt-4 flex items-center justify-between border-t border-line pt-4"><span className="flex items-center gap-1.5 text-xs text-muted"><Clock3 size={14}/>{time} min</span><button onClick={()=>started===key?complete(exercises.find(item=>item.key===key)):setStarted(key)} disabled={busy||(!supabaseConfigured&&started===key)} className="rounded-lg bg-teal px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50">{busy&&started===key?'Saving…':started===key?'Mark complete':'Start exercise'}</button></div></article>)}</div>{message&&<p role="status" className="mt-4 rounded-xl bg-white p-4 text-sm text-muted">{message}</p>}<p className="mt-5 rounded-xl bg-white p-4 text-xs leading-5 text-muted">Sessions record only the exercise name, estimated duration, and completion time. They do not measure cognitive performance.</p></>
+  return (
+    <>
+      <PageHeading eyebrow="YOUR PRACTICE" title="Exercises" description="Choose a short activity. Take a break or stop whenever you like." />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {exercises.map(({ key, title, description, time, icon: Icon, tint, isInteractive }) => (
+          <article key={key} className="flex flex-col rounded-2xl border border-line bg-white p-5 shadow-soft">
+            <div className="flex items-center justify-between">
+              <span className={`grid h-11 w-11 place-items-center rounded-xl ${tint}`}>
+                <Icon size={20} />
+              </span>
+              {isInteractive && (
+                <span className="rounded-full bg-mint px-2.5 py-0.5 text-[10px] font-semibold text-teal">
+                  Interactive
+                </span>
+              )}
+            </div>
+            <h3 className="mt-4 text-base font-semibold">{title}</h3>
+            <p className="mt-2 min-h-10 text-sm leading-5 text-muted">{description}</p>
+            <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
+              <span className="flex items-center gap-1.5 text-xs text-muted">
+                <Clock3 size={14} />~{time} min
+              </span>
+              {isInteractive ? (
+                <button
+                  onClick={() => setActiveGame(key)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-teal px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-700 transition"
+                >
+                  <Play size={13} fill="currentColor" /> Play game
+                </button>
+              ) : (
+                <button
+                  onClick={() => started === key ? complete(exercises.find(item => item.key === key)) : setStarted(key)}
+                  disabled={busy || (!supabaseConfigured && started === key)}
+                  className="rounded-lg bg-teal px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {busy && started === key ? 'Saving…' : started === key ? 'Mark complete' : 'Start exercise'}
+                </button>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+      {message && <p role="status" className="mt-4 rounded-xl bg-white p-4 text-sm text-muted">{message}</p>}
+      <p className="mt-5 rounded-xl bg-white p-4 text-xs leading-5 text-muted">
+        Sessions record only the exercise name, estimated duration, and completion time. They are recreational cognitive activities and do not measure or evaluate clinical performance.
+      </p>
+    </>
+  )
 }
 function MoodPage() {
   const [selected, setSelected] = useState('')
