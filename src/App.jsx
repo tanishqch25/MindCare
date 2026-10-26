@@ -377,6 +377,8 @@ function Dashboard({ user, onSignOut }) {
   const [checkins, setCheckins] = useState([])
   const [loading, setLoading] = useState(Boolean(supabaseConfigured && user))
   const [dbError, setDbError] = useState('')
+  const [quickSaving, setQuickSaving] = useState(false)
+  const [quickFeedback, setQuickFeedback] = useState('')
 
   const fetchOverviewData = useCallback(async () => {
     if (!supabaseConfigured || !user) {
@@ -415,6 +417,28 @@ function Dashboard({ user, onSignOut }) {
       setLoading(false)
     }
   }, [user])
+
+  const handleQuickMood = async (label) => {
+    if (!supabaseConfigured || !user) {
+      navigate('Mood check-in')
+      return
+    }
+    setQuickSaving(true)
+    setQuickFeedback('')
+    try {
+      const { error } = await supabase.from('mood_checkins').insert({ mood: label })
+      if (error) {
+        setQuickFeedback('Could not save check-in. Confirm database tables are set up.')
+      } else {
+        setQuickFeedback(`Recorded: ${label}`)
+        await fetchOverviewData()
+      }
+    } catch {
+      setQuickFeedback('Unable to save check-in right now.')
+    } finally {
+      setQuickSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (active === 'Overview' && supabaseConfigured && user) {
@@ -594,6 +618,15 @@ function Dashboard({ user, onSignOut }) {
               <span>Search</span>
               <span className="ml-8 rounded border border-line px-1.5 py-0.5 text-[10px]">⌘ K</span>
             </div>
+            <button
+              aria-label="Refresh dashboard data"
+              title="Refresh dashboard data"
+              onClick={fetchOverviewData}
+              disabled={loading}
+              className="grid h-9 w-9 place-items-center rounded-xl border border-line bg-white text-muted hover:bg-[#fbf9f0] disabled:opacity-50"
+            >
+              <RefreshCw size={15} className={loading ? 'animate-spin text-teal' : ''} />
+            </button>
             <button aria-label="Notifications" className="relative grid h-9 w-9 place-items-center rounded-xl border border-line bg-white text-muted">
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-teal" />
               <Activity size={17} />
@@ -737,19 +770,25 @@ function Dashboard({ user, onSignOut }) {
                   ].map(([emoji, label]) => (
                     <button
                       key={label}
-                      onClick={() => navigate('Mood check-in')}
+                      onClick={() => handleQuickMood(label)}
+                      disabled={quickSaving}
                       aria-label={`I feel ${label.toLowerCase()}`}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl px-2 py-2 transition hover:bg-mint"
+                      className="group flex flex-col items-center gap-1.5 rounded-xl px-2 py-2 transition hover:bg-mint disabled:opacity-50"
                     >
                       <span className="text-[23px] transition group-hover:scale-110">{emoji}</span>
                       <span className="text-[9px] text-muted">{label}</span>
                     </button>
                   ))}
                 </div>
+                {quickFeedback && (
+                  <p role="status" className="mt-2 text-[11px] font-medium text-teal">
+                    ✓ {quickFeedback}
+                  </p>
+                )}
                 <p className="mt-3 text-[10px] leading-4 text-muted">
                   {isDemo
                     ? 'Demo mode: check-ins are not saved yet. Connect Supabase to save your check-ins.'
-                    : 'Your check-in is optional. Tap any mood to record your reflection in Mood check-in.'}
+                    : 'Your check-in is optional. Tap any mood to record directly, or open Mood check-in for details.'}
                 </p>
               </div>
             </div>
